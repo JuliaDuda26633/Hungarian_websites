@@ -1,7 +1,9 @@
+import urllib.parse
 from playwright.sync_api import sync_playwright, Page
 import time
 import logging as log
 import json
+import urllib
 
 log.basicConfig(level=log.INFO)
 selectors = {
@@ -12,6 +14,13 @@ selectors = {
     'post_text' : 'div.cikk-torzs'
 }
 
+def _remove_dex(url:str) -> str:
+    url = urllib.parse.unquote(url)
+    if url.count('http') > 1:
+        url = url.split('http')
+        url = 'http'+url[-1]
+    return url
+
 def generate_pagination_links(base_url: str, last_page: int) -> list[str]:
     links = []
     for p in range(last_page, -1, -1):
@@ -19,6 +28,7 @@ def generate_pagination_links(base_url: str, last_page: int) -> list[str]:
             url = f"{base_url}&p={p}"
         else:
             url = f"{base_url}?p={p}"
+        url = _remove_dex(url)
         links.append(url)
     return links
 
@@ -67,7 +77,8 @@ def scrape_post_from_pages(page: Page, json_filename: str) -> list[str]:
             page.goto(url, timeout=100000)  # Increase timeout if needed
         except Exception as e:
             log.error(f"Error loading {url}: {e}")
-            continue
+            raise Exception(f"Error loading {url}: {e}")
+            #continue #unacceptable way of handling errors
         post_links = _scrape_post(page)
         log.info(f"Scraped {len(post_links)} posts on this page.")
         for plink in post_links:
@@ -88,19 +99,21 @@ def scrape_text_from_post(page: Page, input_json: str, output_json: str):
     post_links = load_links_from_json(input_json)
     log.info(f"Loaded {len(post_links)} post links from {input_json}.")
     results = [] 
+    post_links = [_remove_dex(link) for link in post_links]
     for link in post_links:
         log.info(f"Visiting post page: {link}")
         try:
             page.goto(link, timeout=100000) 
         except Exception as e:
             log.error(f"Timeout or error loading {link}: {e}")
-            continue 
+            raise Exception(f"Timeout or error loading {link}: {e}")
+            # continue # this is a terrible way of handling errors if you don't track what are you skipping
         title = scrape_post_title(page)
         desc = scrape_post_text(page)
         log.info(f"Scraped post data: title length: {len(title)} characters, description length: {len(desc)} characters.")
 
-        if not desc.strip():
-            log.info(f"Skipping product at {link} because description is empty.")
+        if desc and title and not desc.strip() and not title.strip():
+            log.info(f"Skipping product at {link} because description and title is empty.")
             continue
         product_data = {
             "url": link,
@@ -127,16 +140,18 @@ with sync_playwright() as p:
     browser = p.chromium.launch(headless=False)
     context = browser.new_context()
     page = context.new_page()
+    page.set_default_timeout(1000*60)
+    page.set_default_navigation_timeout(1000*60)
     #getting all page links from the webside
-    """base_url = "https://totalbike.hu/technika/motordoktor/" 
-    last_page = 43  
+    base_url = "https://totalbike.hu/technika/motordoktor/" 
+    last_page = 0
     pagination_links = generate_pagination_links(base_url, last_page)
-    save_links_to_json(pagination_links, "totalbike_pages.json")"""
+    save_links_to_json(pagination_links, "totalbike_pages.json")
 
     #getting all the posts from the web pages
-    """totalbike_posts = scrape_post_from_pages(page,"totalbike_pages.json")
+    totalbike_posts = scrape_post_from_pages(page,"totalbike_pages.json")
     save_links_to_json(totalbike_posts, "totalbike_posts.json")
-    log.info(f"Saved {len(totalbike_posts)} posts links to json file.")"""
+    log.info(f"Saved {len(totalbike_posts)} posts links to json file.")
 
     #scrapping all the data from the blog
     scrape_text_from_post(
@@ -146,7 +161,7 @@ with sync_playwright() as p:
     )
 
     #testing
-    """page.goto("https://totalbike.hu/technika/nepperuzo/2018/02/20/penge_de_megbizhato_elmenymotor/")
+    """goto(page,"https://totalbike.hu/technika/nepperuzo/2018/02/20/penge_de_megbizhato_elmenymotor/")
     text = page.locator(selectors["post_text"]).all_inner_texts()
     print(text)
     test1 = scrape_post_text(page)
