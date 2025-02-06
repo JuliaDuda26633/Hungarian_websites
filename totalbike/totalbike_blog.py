@@ -14,12 +14,20 @@ selectors = {
     'post_text' : 'div.cikk-torzs'
 }
 
-def _remove_dex(url:str) -> str:
-    url = urllib.parse.unquote(url)
-    if url.count('http') > 1:
-        url = url.split('http')
-        url = 'http'+url[-1]
-    return url
+def _remove_dex(json_filename: str) -> list[str]:
+    links = load_links_from_json(json_filename)
+    log.info("JSON file was loaded . . .\n")
+    cleaned_links = []
+    for link in links: 
+        url = urllib.parse.unquote(link)
+        if url.count('http') > 1:
+            parts = url.split('http')
+            url = 'http' + parts[-1]
+        cleaned_links.append(url)
+        log.info("Clean url added to the list . . . \n")
+    save_links_to_json(cleaned_links, "clear_totalbike_posts.json")
+    log.info(f"Finished saving clean links to the new file. Cleaned urls: {len(cleaned_links)}")
+    return cleaned_links
 
 def generate_pagination_links(base_url: str, last_page: int) -> list[str]:
     links = []
@@ -28,7 +36,6 @@ def generate_pagination_links(base_url: str, last_page: int) -> list[str]:
             url = f"{base_url}&p={p}"
         else:
             url = f"{base_url}?p={p}"
-        url = _remove_dex(url)
         links.append(url)
     return links
 
@@ -74,13 +81,14 @@ def scrape_post_from_pages(page: Page, json_filename: str) -> list[str]:
     for url in data:
         log.info(f"Visiting: {url}")
         try:
-            page.goto(url, timeout=100000)  # Increase timeout if needed
+            page.goto(url, timeout=100000, wait_until='load')
+            time.sleep(2)
         except Exception as e:
             log.error(f"Error loading {url}: {e}")
             raise Exception(f"Error loading {url}: {e}")
             #continue #unacceptable way of handling errors
         post_links = _scrape_post(page)
-        log.info(f"Scraped {len(post_links)} posts on this page.")
+        log.info(f"Scraped {len(post_links)} posts on this page.\n")
         for plink in post_links:
             all_post_links.add(plink)
     final_list = list(all_post_links)
@@ -99,11 +107,11 @@ def scrape_text_from_post(page: Page, input_json: str, output_json: str):
     post_links = load_links_from_json(input_json)
     log.info(f"Loaded {len(post_links)} post links from {input_json}.")
     results = [] 
-    post_links = [_remove_dex(link) for link in post_links]
     for link in post_links:
         log.info(f"Visiting post page: {link}")
         try:
-            page.goto(link, timeout=100000) 
+            page.goto(link, timeout=100000, wait_until='load') 
+            time.sleep(2)
         except Exception as e:
             log.error(f"Timeout or error loading {link}: {e}")
             raise Exception(f"Timeout or error loading {link}: {e}")
@@ -127,7 +135,7 @@ def scrape_text_from_post(page: Page, input_json: str, output_json: str):
 
 
 def save_links_to_json(links: list[str], filename: str):
-    with open(filename, "w", encoding="utf-8") as f:
+    with open(filename, "a", encoding="utf-8") as f:
         json.dump(links, f, ensure_ascii=False, indent=2)
 
 def load_links_from_json(filename: str) -> list[str]:
@@ -142,21 +150,25 @@ with sync_playwright() as p:
     page = context.new_page()
     page.set_default_timeout(1000*60)
     page.set_default_navigation_timeout(1000*60)
+
     #getting all page links from the webside
-    base_url = "https://totalbike.hu/technika/motordoktor/" 
-    last_page = 0
+    """base_url = "https://totalbike.hu/technika/nepperuzo/" 
+    last_page = 22
     pagination_links = generate_pagination_links(base_url, last_page)
-    save_links_to_json(pagination_links, "totalbike_pages.json")
+    save_links_to_json(pagination_links, "totalbike_pages.json")"""
 
     #getting all the posts from the web pages
-    totalbike_posts = scrape_post_from_pages(page,"totalbike_pages.json")
+    """totalbike_posts = scrape_post_from_pages(page,"totalbike_pages.json")
     save_links_to_json(totalbike_posts, "totalbike_posts.json")
-    log.info(f"Saved {len(totalbike_posts)} posts links to json file.")
+    log.info(f"Saved {len(totalbike_posts)} posts links to json file.")"""
+
+    #clearing the urls in json file and creating new clear version
+    """_remove_dex("totalbike_posts.json")"""
 
     #scrapping all the data from the blog
     scrape_text_from_post(
         page,
-        input_json= "totalbike_posts.json",
+        input_json= "clear_totalbike_posts.json",
         output_json= "totalbike_final_output.json"
     )
 
