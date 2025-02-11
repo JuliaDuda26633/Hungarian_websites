@@ -12,7 +12,9 @@ selectors = {
     'pagination_last_page' : 'a.page-link.page-last',
     'product' : 'a.btn.btn-outline-primary',
     'product_title' : 'span.product-page-product-name',
-    'product_desc' : '#productcustomcontent-wrapper div.module-body' 
+    'product_desc_1' : '#productcustomcontent-wrapper div.module-body',
+    'product_desc_2' : '#tab-productdescriptionnoparameters',
+    'product_desc_3' : 'td.param-value.product-short-description'
 }
 
 def _scrape_menu():
@@ -114,7 +116,13 @@ def scrape_product_desc(page: Page) -> str:
     Expects an element matching selectors['product_desc'].
     Returns the text content as a string, or an empty string if not found.
     """
-    desc_element = page.query_selector(selectors["product_desc"])
+    desc_element = page.query_selector(selectors["product_desc_1"])
+    if desc_element:
+        return desc_element.inner_text().strip()
+    desc_element = page.query_selector(selectors["product_desc_2"])
+    if desc_element:
+        return desc_element.inner_text().strip()
+    desc_element = page.query_selector(selectors["product_desc_3"])
     if desc_element:
         return desc_element.inner_text().strip()
     return ""
@@ -183,7 +191,7 @@ with sync_playwright() as p:
     page.set_default_navigation_timeout(1000*60)
 
     page.goto("https://www.tornadohelmets.hu/")
-    #scraping main links first:
+    """#scraping main links first:
     menu_links = _scrape_menu()
     log.info(f"Loaded {len(menu_links)} menu links . . .\n")
     time.sleep(2)
@@ -221,7 +229,7 @@ with sync_playwright() as p:
         output_jsonfile="tornadohelmets/tornadohelmets_products_links.json"
     )
     time.sleep(2)
-    log.info("\n Scarping product infromation has began. . .\n")
+    log.info("\n Scarping product infromation has began. . .\n")"""
     #scarping products text from product links
     scrape_text_from_product(
         page=page,
