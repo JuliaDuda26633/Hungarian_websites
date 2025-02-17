@@ -19,8 +19,8 @@ This repository contains web scraping scripts for various Hungarian websites. Ea
 - **tornadohelmets**  
   Contains scripts for scraping a website related to helmets.[tornadohelmets.hu](https://www.tornadohelmets.hu/).
 
-  - **mototoazis**
-    Contains scripts for scraping [mototoazis.hu](https://www.motoroazis.hu/)
+- **mototoazis**
+  Contains scripts for scraping [mototoazis.hu](https://www.motoroazis.hu/)
 
 ## Requirements
 
